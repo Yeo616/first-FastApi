@@ -23,10 +23,10 @@ google-auth-oauthlib==0.8.0
 graphene==3.1.1
 graphql-core==3.2.3
 graphql-relay==3.2.0
-h11==0.9.0
-httpcore==0.15.0
+# h11==0.9.0
+# httpcore==0.15.0
 httptools==0.5.0
-httpx==0.23.1
+# httpx==0.23.1
 idna==2.10
 itsdangerous==2.1.2
 jaeger-client==4.3.0
