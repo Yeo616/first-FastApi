@@ -22,8 +22,6 @@ StreamHandler = logging.StreamHandler()                                         
 StreamHandler.setFormatter(formatter)                                                
 logger.addHandler(StreamHandler)                                                     # logger 인스턴스에 handler 설정
 
-
-
 # 회원가입
 @router.post("/register")
 def user_register(user: User_Register): # 1. 클라에서 보내준 데이터 받기 + , program: Program
