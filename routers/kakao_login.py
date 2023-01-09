@@ -5,9 +5,19 @@ from fastapi.responses import PlainTextResponse,JSONResponse
 import pymongo
 from datetime import datetime, timedelta
 import jwt
-
+import logging
 
 router = APIRouter(prefix = '/users', tags= ['Social_login'])
+
+# 로그 생성
+logger = logging.getLogger('register')                                               # Logger 인스턴스 생성, 命名
+logger.setLevel(logging.DEBUG)                                                       # Logger 출력 기준 설정
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')# Formatter 생성, log 출력 형식
+
+# log 출력
+StreamHandler = logging.StreamHandler()                                              # 콘솔 출력 핸들러 생성
+StreamHandler.setFormatter(formatter)                                                
+logger.addHandler(StreamHandler)    
 
 class KakaoUser(BaseModel):
     sns_type = "kakao"
@@ -50,8 +60,8 @@ def kakao_register( req = Body()):
     email = req["email"]
     jwt_exp = req["expires"]
     
-    print(email)
-    print(db.find({"email":f"{email}"}))
+    logger.info(f"email : {email}")
+    logger.info(f'email : {db.find({"email":f"{email}"})}')
 
     # DB에 데이터가 없다면, 회원가입
     if db.count_documents({"email":f"{email}"}) != 1:
@@ -62,19 +72,19 @@ def kakao_register( req = Body()):
         "created_at" : datetime.utcnow()
         })
         
-        print(1.0)
+        logger.info("no db, register started")
 
         result = db.insert_one(data)
-        print(2)
-        print(result.inserted_id)
+        logger.info("email had been uploaded on db")
+        logger.info(f"inserted_id : {result.inserted_id}")
 
-    print(3)
     # DB에 존재하는 사용자는 데이터를 가져온다. 
+    logger.info("get user info via db")
 
     user = db.find_one({"email":f"{email}"})
     data = {"email" : user['email'], "exp" : f"{jwt_exp}"}
     
-    print(user)
+    logger.info(f"user info : {user}")
 
     # 토큰을 만료기간까지 포함해서 발급한다.
     # 토큰 발행
@@ -82,6 +92,6 @@ def kakao_register( req = Body()):
     # Authorization=f"Bearer {create_access_token(data=UserToken.from_orm.dict(user),)}")
     Authorization=f"Bearer {create_access_token(data=data,expires_delta=30)}")
 
-    print(token)
+    logger.info(f"token : {token}")
 
     return req,token

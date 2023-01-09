@@ -4,8 +4,19 @@ from fastapi.responses import JSONResponse
 import pymongo
 from datetime import datetime, timedelta
 import jwt
+import logging
 
 router = APIRouter(prefix = '/users', tags= ['Social_login'])
+
+# 로그 생성
+logger = logging.getLogger('register')                                               # Logger 인스턴스 생성, 命名
+logger.setLevel(logging.DEBUG)                                                       # Logger 출력 기준 설정
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')# Formatter 생성, log 출력 형식
+
+# log 출력
+StreamHandler = logging.StreamHandler()                                              # 콘솔 출력 핸들러 생성
+StreamHandler.setFormatter(formatter)                                                
+logger.addHandler(StreamHandler)    
 
 class NaverUser(BaseModel):
     sns_type = "naver"
@@ -47,10 +58,10 @@ def naver_register( req = Body()):
     jwt_exp = req["expires"]
     nickname = req["name"]
    
-    print("email : ", email)
-    print("req",req)
-    print("login_time:", datetime.now())
-    print(db.find({"email":f"{email}"}))
+    logger.info(f"email : {email}")
+    logger.info(f"req : {req}")
+    logger.info(f"login_time : {datetime.now()}")
+    logger.info(f'db.find() : {db.find({"email":f"{email}"})}')
 
     # DB에 데이터가 없다면, 회원가입
     if db.count_documents({"email":f"{email}"}) == 0:
@@ -72,6 +83,6 @@ def naver_register( req = Body()):
     token = dict(
     Authorization=f"Bearer {create_access_token(data=data,expires_delta=30)}")
 
-    print(token)
+    logger.info(f"token : {token}")
 
     return req,token

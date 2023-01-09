@@ -6,8 +6,19 @@ from typing import List
 
 import uuid
 import os
+import logging
 
 router = APIRouter(prefix='/images')
+
+# 로그 생성
+logger = logging.getLogger('register')                                               # Logger 인스턴스 생성, 命名
+logger.setLevel(logging.DEBUG)                                                       # Logger 출력 기준 설정
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')# Formatter 생성, log 출력 형식
+
+# log 출력
+StreamHandler = logging.StreamHandler()                                              # 콘솔 출력 핸들러 생성
+StreamHandler.setFormatter(formatter)                                                
+logger.addHandler(StreamHandler)    
 
 # 이미지 로컬에 업로드
 @router.post("/uploadfiles")
@@ -24,8 +35,8 @@ async def create_upload_files(files: List[UploadFile] = File(...)):
         with open(os.path.join(UPLOAD_DIRECTORY, saved_file_name), "wb") as fp: # 해당 경로에 있는 파일을 바이러니 형식으로 open
             fp.write(contents) # 로컬에 이미지 저장(쓰기)
 
-        print("original file name: ",file.filename)
-        print("file_names : ",saved_file_name)
+        logger.infot(f"original file name : {file.filename}")
+        logger.infot(f"file_names : {saved_file_name}")
 
     return {"filenames": [saved_file_name for file in files]} # 파일 더미에서 각 저장한 파일명 호출
 
