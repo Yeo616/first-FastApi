@@ -13,14 +13,14 @@ import logging
 router = APIRouter(prefix = '/users/snstype/email',tags= ['users'])
 
 # 로그 생성
-logger = logging.getLogger('register')                                          # Logger 인스턴스 생성, 命名
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s') # Formatter 생성, log 출력 형식
+logger = logging.getLogger('register')                                               # Logger 인스턴스 생성, 命名
+logger.setLevel(logging.DEBUG)                                                       # Logger 출력 기준
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')# Formatter 생성, log 출력 형식
 
 # log 출력
-StreamHandler = logging.StreamHandler()                                           # 콘솔 출력 핸들러 생성
-StreamHandler.setFormatter(formatter)                                            
-logger.addHandler(StreamHandler)                                                 # logger 인스턴스에 handler 설정
+StreamHandler = logging.StreamHandler()                                              # 콘솔 출력 핸들러 생성
+StreamHandler.setFormatter(formatter)                                                
+logger.addHandler(StreamHandler)                                                     # logger 인스턴스에 handler 설정
 
 
 

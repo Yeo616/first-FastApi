@@ -11,13 +11,24 @@ import pydantic
 from bson import json_util
 from bson.objectid import ObjectId
 pydantic.json.ENCODERS_BY_TYPE[ObjectId]=str
+import logging
+import typing
 
 router = APIRouter(prefix = '/users', tags= ['users'])
+
+# 로그 생성
+logger = logging.getLogger('register')                                               # Logger 인스턴스 생성, 命名
+logger.setLevel(logging.DEBUG)                                                       # Logger 출력 기준 설정
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')# Formatter 생성, log 출력 형식
+
+# log 출력
+StreamHandler = logging.StreamHandler()                                              # 콘솔 출력 핸들러 생성
+StreamHandler.setFormatter(formatter)                                                
+logger.addHandler(StreamHandler)     
 
 JWT_SECRET = 'adcec27a3417b2de82130a2c54fc5c65aca0d7fa41b0a01dc310f3c78a62f885'
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
 
 jwt_exp = datetime.utcnow() + timedelta(days=30)
 
@@ -29,21 +40,21 @@ class Token(BaseModel): # endpoint에서 응답으로 사용될 token
 class TokenData(BaseModel):
     username:str | None = None
 
-import typing
-
 @router.get('/check-login')
 async def check_login(token: Request = Header()): 
     
-    print("Header : ", token)
-    print('req.headers :' ,token.headers)
-    print('req.headers.get("access_token") :', token.headers.get('access_token'))
-    
+    logger.info(f"Header : {token}")
+    logger.info(f"req.headers : {token.headers}")
+    logger.info(f"req.headers.get('access_token') : {token.headers.get('access_token')}")
+
     token = token.headers.get('access_token')
 
     try :
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        print('decoded_info : ', payload)
-        print("email : ", payload['email'])
+
+        logger.info(f"decoded_info : {payload}")
+        logger.info(f"email : {payload['email']}")
+
         email = payload['email']
         
         # DB연결
@@ -53,8 +64,8 @@ async def check_login(token: Request = Header()):
 
         # DB에 존재하는 사용자는 데이터를 가져온다.
         user = db.find_one({"email":f"{email}"})
-        print("user : ",user)
-        print("user['nickname'] : ",user["nickname"])
+        logger.info(f"user : {user}")
+        logger.info(f"user['nickname'] : {user['nickname']}")
 
         nickname = user["nickname"]
 
