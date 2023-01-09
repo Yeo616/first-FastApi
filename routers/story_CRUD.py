@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Header, Query, File, UploadFile
+from fastapi import APIRouter, HTTPException, Header, Query, File, UploadFile, Form
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import  BaseModel
 # from pyjwt import decode, InvalidTokenError
@@ -36,19 +36,19 @@ logger.addHandler(StreamHandler)
 # UPLOAD_DIRECTORY = "./saving_images/"
 
 class StoryPost(BaseModel): # 스키마 모델링
-    program_title : str # essential, 연관된 프로그램 제목
+    program_title : str = Form() # essential, 연관된 프로그램 제목
     # program_id : str # essential, 연관된 프로그램 제목 DB 저장된 id
 
-    title:str # essential, 스토리 제목
-    content:str # essential, 스토리 내용
-    degree: str # essential, 회원 등급
-    on_offline: str # essential, 수업 방식
-    class_contents: str # essential, 수업 내용
-    advance : str # essential, 기존 조건
+    title:str = Form() # essential, 스토리 제목
+    content:str = Form() # essential, 스토리 내용
+    degree: str = Form() # essential, 회원 등급
+    on_offline: str = Form() # essential, 수업 방식
+    class_contents: str = Form() # essential, 수업 내용
+    advance : str = Form() # essential, 기존 조건
 
     # img: str | None = None # non-essential, 스토리 내용 삽입 이미지
 
-    author: str # essential, 작성자 email
+    author: str = Form() # essential, 작성자 email
 
     created_at: datetime = datetime.now() # essential, 스토리 생성 날짜
     updated_at: datetime| None = None # non-essential, 스토리 수정 날짜
@@ -66,41 +66,39 @@ class StoryPost(BaseModel): # 스키마 모델링
         "created_at" : datetime.now()}
 
 class Degree(str): ## 회원 등급
-    nobase: str = "nobase" 
-    elementry: str = "elementry"
-    middle: str = "middle"
-    high: str = "high"
-    university: str = "university"
+    nobase: str = Form()
+    elementry: str = Form()
+    middle: str = Form()
+    high: str = Form()
+    university: str = Form()
 
 class on_offline(str): ## 수업 방식
-    online: str = "online"
-    offline: str = "offline"
-    on_offline: str = "on_offline"
-    visit: str = "visit"
-    outisde: str = "outisde"
+    online: str = Form()
+    offline: str = Form()
+    on_offline: str = Form()
+    visit: str = Form()
+    outisde: str = Form()
 
 class Class_contents(str): ## 수업 내용
-    phonics: str = "phonics"
-    reading: str = "reading"
-    toeic_ielts: str = "toeic_ielts"
-    business_english: str = "business_english"
-    job_interview: str = "job_interview"
-    etc: str = "etc"
+    phonics: str = Form()
+    reading: str = Form()
+    toeic_ielts: str = Form()
+    business_english: str = Form()
+    job_interview: str = Form()
+    etc: str = Form()
 
 class Advance(str): ## 기존 조건
-    quality:str = "quality"
-    facilities:str = "facilities"
-    price : str = "price"
-    enviornment : str = "enviornment"
-    system : str = "system"
+    quality:str = Form()
+    facilities:str = Form()
+    price : str = Form()
+    enviornment : str = Form()
+    system : str = Form()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl = 'token')
 
 JWT_SECRET = 'adcec27a3417b2de82130a2c54fc5c65aca0d7fa41b0a01dc310f3c78a62f885'
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-import math
 
 # 선택으로 검색기능, (토큰x, 페이징 처리)
 @router.get("/search_option", tags=["story_without_Token"])
@@ -238,14 +236,30 @@ def validate_token(token: str):
         logger.error(f"token : {token} is not valid")
         raise HTTPException(status_code=401, detail= 'Invalid token')
 
-# 스토리 추가, 토큰없이 테스트
+# 스토리 추가(with file), 토큰없이 테스트
 @router.post("/posts/test", tags=['story_without_Token'])
-async def create_post_test(post: StoryPost,
-                           files: UploadFile = File(default=None)
+async def create_post_test(
+                        # post: StoryPost = Form(...),
+                        # program_title : str , 
+                        # title:str , 
+                        # content:str , 
+                        # degree: str , 
+                        # on_offline: str , 
+                        # class_contents: str , 
+                        # advance : str , 
+                        program_title : str = Form(...), 
+                        title:str = Form(...), 
+                        content:str = Form(...), 
+                        degree: str = Form(...), 
+                        on_offline: str = Form(...), 
+                        class_contents: str = Form(...), 
+                        advance : str = Form(...), 
+                        files: UploadFile = File(...)
                      ):
-
-    logger.info(f"had input : {post}")
-    # logger.info(f"files : {files}")
+    print("program_title : ", program_title)
+    # logger.info(f"had input : {post}")
+    logger.info(f"had input : program title: {program_title}, title : {title}, content : {content}, degree: {degree}, on_offline : {on_offline}, class_contents : {class_contents}, advance: {advance}")
+    logger.info(f"files : {files}")
 
     # 사전 유효성 검사
     degree_list = ["nobase", "elementary", "middle", "high", "university"]
@@ -253,16 +267,20 @@ async def create_post_test(post: StoryPost,
     class_contents_list = ["phonics", "reading", "toeic_ielts", "business_english", "job_interview", "etc"]
     advance_list = ["quality", "facilities", "price", "environment", "system"]
 
-    if not post.degree in degree_list:
+    # if not post.degree in degree_list:
+    if not degree in degree_list:
         raise HTTPException(status_code=400, detail="wrong degree input") 
    
-    if not post.on_offline in on_offline_list:
+    # if not post.on_offline in on_offline_list:
+    if not on_offline in on_offline_list:
         raise HTTPException(status_code=400, detail="wrong on_offline input") 
    
-    if not post.class_contents in class_contents_list:
+    # if not post.class_contents in class_contents_list:
+    if not class_contents in class_contents_list:
         raise HTTPException(status_code=400, detail="wrong class_contents input") 
 
-    if not post.advance in advance_list:
+    # if not post.advance in advance_list:
+    if not advance in advance_list:
         raise HTTPException(status_code=400, detail="wrong advance input") 
 
     # DB연결
@@ -270,7 +288,8 @@ async def create_post_test(post: StoryPost,
    
     #프로그램 관련 DB 연결
     program_db = myclient['test']['program_db']
-    program_title = post.program_title
+    # program_title = post.program_title
+    
     # 입력받은 값: program_title
     program_info_db = program_db.find({"program_title": program_title})
     program_info_db = list(program_info_db)
@@ -280,7 +299,8 @@ async def create_post_test(post: StoryPost,
     # program_title 입력이 잘못 되었을 경우
     if len(program_info_db) != 1:
         raise HTTPException(status_code=400, detail="wrong program title") 
-    logger.info(f'program_title_count : {program_db.count_documents({"program_title": post.program_title})}')
+    # logger.info(f'program_title_count : {program_db.count_documents({"program_title": post.program_title})}')
+    logger.info(f'program_title_count : {program_db.count_documents({"program_title": program_title})}')
 
     # 참고하는 프로그램 정보
     program_id = program_info_db[0]['_id']
@@ -289,14 +309,14 @@ async def create_post_test(post: StoryPost,
     # DB연결
     db = myclient["test"]["story_db"]
     
-    data = {"program_title": post.program_title,
+    data = {"program_title": program_title,
             "program_id": program_id,
-            "title": post.title, 
-            "content":post.content, 
-            "degree": post.degree,
-            "on_offline": post.on_offline,
-            "class_contents": post.class_contents,
-            "advance" : post.advance,
+            "title": title, 
+            "content": content, 
+            "degree": degree,
+            "on_offline": on_offline,
+            "class_contents": class_contents,
+            "advance" : advance,
             "author": "test",
             "created_at": datetime.now()}
 
@@ -315,46 +335,52 @@ async def create_post_test(post: StoryPost,
                 "program_info":f"{program_info_db}"} # 연관된 프로그램 정보
     
     ##============ 이미지 업로드(대표 이미지) ==================
-    
     # 이미지 저장할 경로 지정
     UPLOAD_DIRECTORY = "./saving_images/"
-    LOCAL_URL = "http://localhost:8000"
-
-    path_list = []
+    LOCAL_URL = "http://192.168.1.101:8000"
 
     # 이미지 DB 연결
     image_db = myclient["test"]["image_db"]
 
     currentTime = datetime.now().strftime("%Y%m%d%H%M%S")
-    for file in files:
-        contents = await file.read() # 파일을 읽는 동안 CPU가 다른 일을 하도록 명령
-        saved_file_name = f"{currentTime}{str(uuid.uuid4())}.jpg" # 업로드한 시간과 UUID를 이용해서 유니크한 파일명으로 변경
-        saved_file_path = f"{LOCAL_URL}/images/{saved_file_name}" # localhost:8000/ 파일 경로 url
-
-        # DB에 이미지 저장
-        image_data = {"image_url": saved_file_path,
-                  "image_name": saved_file_name,
-                  "story_refered_id": program_id,
-                  "created_at": datetime.now()}
-
-        image_content = image_db.insert_one(image_data)
-        image_content_id = image_content.inserted_id
-        logger.info(f"image content_id : {image_content_id}")
-
-        logger.info(f"original file name: {file.filename}")
-        logger.info(f"file_names : {saved_file_name}")
-        logger.info(f"file_path: {saved_file_path}")
-
-        with open(os.path.join(UPLOAD_DIRECTORY, saved_file_name), "wb") as fp: # 해당 경로에 있는 파일을 바이러니 형식으로 open
-            fp.write(contents) # 로컬에 이미지 저장(쓰기)
-            path_list.append(saved_file_path)
     
+    contents = await files.read() # 파일을 읽는 동안 CPU가 다른 일을 하도록 명령
+    saved_file_name = f"{currentTime}{str(uuid.uuid4())}.jpg" # 업로드한 시간과 UUID를 이용해서 유니크한 파일명으로 변경
+    saved_file_path = f"{LOCAL_URL}/images/{saved_file_name}" # localhost:8000/ 파일 경로 url
+
+    # DB에 이미지 저장
+    image_data = {
+            "story_id" : ObjectId(content_id),
+            "image_url": saved_file_path,
+            "image_name": saved_file_name,
+            "story_refered_id": program_id,
+            "created_at": datetime.now()}
+
+    image_content = image_db.insert_one(image_data)
+    image_content_id = image_content.inserted_id
+    logger.info(f"image content_id : {image_content_id}")
+
+    # logger.info(f"original file name: {file.filename}")
+    logger.info(f"file_names : {saved_file_name}")
+    logger.info(f"file_path: {saved_file_path}")
+
+    with open(os.path.join(UPLOAD_DIRECTORY, saved_file_name), "wb") as fp: # 해당 경로에 있는 파일을 바이러니 형식으로 open
+        fp.write(contents) # 로컬에 이미지 저장(쓰기)
+    
+    # 위에 생성한 story에다가 img_url 추가하기
+    db.update_one({"_id": ObjectId(content_id)},{"$set":{"img": saved_file_path}})
+
+    logger.info(f"content_modified : {db.find_one({'_id': ObjectId(content_id)})}")
+    
+    content_db = db.find_one({"_id": ObjectId(content_id)})
+
     # 연관된 프로그램 정보도 넘기게 하였음.
-    # return {"file_path": [saved_file_path for file in files], } # 파일 더미에서 각 저장한 경로 및 파일명 호출
-    return {"file_path": [file for file in path_list], # 파일 더미에서 각 저장한 경로 및 파일명 호출
+    return {
+            "file_path": saved_file_path, # 파일 더미에서 각 저장한 경로 및 파일명 호출
             "content_id":f"{content_id}", # 스토리 콘텐츠 아이디
-            "content_data": data_in_db,   # 스토리 입력 값
-            "program_info":f"{program_info_db}"} # 연관된 프로그램 정보
+            "content_data": content_db,   # 스토리 입력 값
+            "program_info":f"{program_info_db}"
+            } # 연관된 프로그램 정보
 
 # create a new story post with token
 @router.post("/posts", tags=['story'])
@@ -427,7 +453,6 @@ def create_post(post: StoryPost, token: str = Header()):
             "created_at": datetime.now()}
 
     content = db.insert_one(data)
-    # logger.info(f"content : {content}")
     content_id = content.inserted_id
     logger.info(f"this content_id : {content_id}")
 
@@ -435,7 +460,6 @@ def create_post(post: StoryPost, token: str = Header()):
     data_in_db = db.find_one({"_id": ObjectId(content_id)})
     logger.info(f"content : {data_in_db}")
    
-
     return {"content_id":f"{content_id}", # 스토리 콘텐츠 아이디
             "content_data": data_in_db,   # 스토리 입력 값
             "program_info":f"{program_info_db}"} # 연관된 프로그램 정보

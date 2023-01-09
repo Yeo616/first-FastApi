@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from datetime import datetime
 import os
@@ -26,6 +26,11 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 StreamHandler = logging.StreamHandler()                                              # 콘솔 출력 핸들러 생성
 StreamHandler.setFormatter(formatter)                                                
 logger.addHandler(StreamHandler)    
+
+@router.post("/test_for_get_form_data")
+async def test_get_form_data(program_title: str = Form()):
+    return print(program_title)
+
 
 # 이미지 로컬에 업로드
 @router.post("/uploadfiles")
