@@ -8,12 +8,23 @@ import pymongo
 from bson import json_util
 from bson.objectid import ObjectId
 from enum import Enum
-
 from dataclasses import dataclass
+import logging
+import math
 
 pydantic.json.ENCODERS_BY_TYPE[ObjectId]=str
 
 router = APIRouter()
+
+# 로그 생성
+logger = logging.getLogger('progrmas')                                               # Logger 인스턴스 생성, 命名
+logger.setLevel(logging.DEBUG)                                                       # Logger 출력 기준 설정
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')# Formatter 생성, log 출력 형식
+
+# log 출력
+StreamHandler = logging.StreamHandler()                                              # 콘솔 출력 핸들러 생성
+StreamHandler.setFormatter(formatter)                                                
+logger.addHandler(StreamHandler)    
 
 class Programs(BaseModel):
     program_title:str # essential, 프로그램 이름
@@ -92,8 +103,8 @@ async def search_programs(
                         page: int = Query(1, description="Page number", ge=1)
                         ):
 
-    print("first 2 datas : ", search_option_degree, search_option_on_offline)
-    print("last 2 datas : ", search_option_class_contents, search_option_class_advance)
+    logger.info(f'first 2 datas : {search_option_degree}, {search_option_on_offline}')
+    logger.info(f'last 2 datas : {search_option_class_contents}, {search_option_class_advance}')
 
     # 페이징: 한 페이지 당 몇 개의 게시물을 출력할 것인가
     limit = 3
@@ -101,16 +112,21 @@ async def search_programs(
     # DB연결
     myclient = pymongo.MongoClient("mongodb://localhost:27017/")
     db = myclient["test"]["program_db"]
-    print("db is connected.")
+
+    logger.info('db is connected')
 
     # 입력값이 없을 경우: 모든 데이터 출력
     if search_option_degree is None and search_option_on_offline is None and search_option_class_contents is None and search_option_class_advance is None:
         
         # datas = db.find({}) # 페이징 처리 안할 때
         datas = db.find({}).skip((page - 1) * limit).limit(limit) # 페이징 처리
-        print("no input data, return all the data")
+
+        logger.info('no input data, return all the data')
+        
         datas = list(datas)
-        print(datas)
+
+        logger.info(f'data : {datas}')
+
         return datas  # program_db 컬럭션에 있는 모든 데이터를 가져옴
 
     option_list = [search_option_degree, search_option_on_offline, search_option_class_contents, search_option_class_advance]
@@ -120,7 +136,7 @@ async def search_programs(
     for i in option_list:
         if i is not None:
             search_option_list.append(i)
-            print(f"{i} has appended to search_option_list")
+            logger.info(f"{i} has appended to search_option_list")
     
     # None값이 아닌 것 중에 판단하기 
     query_list= []
@@ -128,45 +144,45 @@ async def search_programs(
         if i == search_option_degree:
             result_1 = {"degree":search_option_degree}
             query_list.append(result_1)
-            print("result_1 has appended to query_list.")
+            logger.info("result_1 has appended to query_list.")
 
         if i == search_option_on_offline:
             result_2 = {"on_offline":search_option_on_offline}
             query_list.append(result_2)
-            print("result_2 has appended to query_list.")
+            logger.info("result_2 has appended to query_list.")
 
         if i == search_option_class_contents:
             result_3 = {"class_contents":search_option_class_contents}
             query_list.append(result_3)
-            print("result_3 has appended to query_list.")
+            logger.info("result_3 has appended to query_list.")
 
         if i == search_option_class_advance:
             result_4 = {"advance":search_option_class_advance}
             query_list.append(result_4)
-            print("result_4 has appended to query_list.")
+            logger.info("result_4 has appended to query_list.")
       
 
     if len(query_list)>=2:
         query = {"$and" : query_list} 
-        print(f"{len(query_list)} query was created.")
+        logger.info(f"{len(query_list)} query was created.")
 
     else:
         query = query_list[0]
-        print("1 query was created.")
-        
+        logger.info("1 query was created.")
+
     # Issue the query to the "documents" collection
     # 검색 결과에서 가져올 데이터만 추린다. 
     results = db.find(query)
     # results = db.find(query).skip((page - 1) * limit).limit(limit)
     results = list(results)
-    print("results: ", results)
-    print(f"results: {len(results)} results were returned.")
+    
+    logger.info(f"results : {results}")
+    logger.info(f"results: {len(results)} results were returned.")
 
     # 결과값이 없으면
     if len(results) <= 0:
         return {"results": "No data found"}
     
-
     # limit(한 페이지에 보여주는 결과) 보다 결과값이 적으면, 페이징 처리할 필요가 없음
     if len(results) <= limit:
         return results
@@ -176,13 +192,14 @@ async def search_programs(
     # limit보다 결과물이 많을 때
     # 페이징: 게시물의 총 개수 세기
     tot_count = len(list(db.find(query)))
-    print("tot_count: ", tot_count)
+    logger.info(f"tot_count : {tot_count}")
 
     # 페이징: 마지막 페이지의 수 구하기
     last_page_num = math.ceil(tot_count / limit) # 페이징: 반드시 올림을 해줘야함
-    print("last_page_num: ", last_page_num)
+    logger.info(f"last_page_num : {last_page_num}")
 
     if last_page_num < page:    # 페이징: 페이지 번호가 마지막 페이지 수보다 클때 에러 발생
+        logger.error(f"last_page_num : {last_page_num} < page : {page}")
         raise HTTPException(
                     status_code = 400,detail=f'last pagination is {last_page_num}, page number should be less than last page number')
 
@@ -191,15 +208,15 @@ async def search_programs(
 
     # 페이징: 현재 블럭의 위치 (첫 번째 블럭이라면, block_num = 0)
     block_num = int((page - 1) / block_size)
-    print("block_num: ", block_num)
+    logger.info(f"block_num : {block_num}")
 
     # 페이징: 현재 블럭의 맨 처음 페이지 넘버 (첫 번째 블럭이라면, block_start = 1, 두 번째 블럭이라면, block_start = 6)
     block_start = (block_size * block_num) + 1
-    print("block_start: ", block_start)
+    logger.info(f"block_start : {block_start}")
 
     # 페이징: 현재 블럭의 맨 끝 페이지 넘버 (첫 번째 블럭이라면, block_end = 5)
     block_end = block_start + (block_size - 1)
-    print("block_end: ", block_end)
+    logger.info(f"block_end : {block_end}")
    
     return results
 
@@ -208,35 +225,36 @@ async def search_programs(
 @router.get("/programs/search-text", tags=["program_without_Token"])
 async def search_programs(data = None, page: int = Query(1, description="Page number", ge=1)):
 
-    print('data:' ,data)
+    logger.info(f"data : {data}")
     # 페이징: 한 페이지 당 몇 개의 게시물을 출력할 것인가
     limit = 3
 
     # DB연결
     myclient = pymongo.MongoClient("mongodb://localhost:27017/")
     db = myclient["test"]["program_db"]
-    print("db is connected.")
+    logger.info("db is connected.")
 
     # 입력값이 없을 경우: 모든 데이터 출력
     if data is None:
         datas = db.find({}).skip((page - 1) * limit).limit(limit)
-        print("no data, return all the data")
+        logger.info("no data, return all the data")
+
         datas = list(datas)
-        print(datas)
-        return datas  # program_db 컬럭션에 있는 모든 데이터를 가져옴
+        logger.info(f"datas : {datas}")
+        return datas# program_db 컬럭션에 있는 모든 데이터를 가져옴
 
     # 입력값 양쪽 공백 제거
     data = data.strip()
-    print("data has trimmed")
+    logger.info("data has trimmed")
 
     ##### 문자 사이에 공백이 많을 경우 -> 공백 하나로 치환
     # 방법1: replace
     while True:
         if "  " in data:
             data = data.replace("  " , " ")
-            print("data blank has replaced as ' '.")
+            logger.info("data blank has replaced as ' '.")
         else:
-            print("No more extra blank.")
+            logger.info("No more extra blank.")
             break
         
     # 방법2 : 문자열 나누기와 문자열 합치기(split_join)
@@ -253,14 +271,14 @@ async def search_programs(data = None, page: int = Query(1, description="Page nu
     {"program_title": {"$regex": data, "$options": "i"}}, # 대소문자 상관없이
     {"program_description": {"$regex": data, "$options": "i"}} ]} # 포함되어있는 데이터
     
-    print("query was created.")
+    logger.info("query was created.")
 
     # Issue the query to the "documents" collection
     # 검색 결과에서 가져올 데이터만 추린다. 
     results = db.find(query).skip((page - 1) * limit).limit(limit)
     results = list(results)
-    print("data has found.")
-    print("results : ", results)
+    logger.info("data has found.")
+    logger.info(f"results : {results}[0]")
 
     # 결과값이 없으면
     if len(results) <= 0:
@@ -268,13 +286,14 @@ async def search_programs(data = None, page: int = Query(1, description="Page nu
 
     # 페이징: 게시물의 총 개수 세기
     tot_count = len(list(db.find(query)))
-    print("tot_count: ", tot_count)
+    logger.info(f"tot_count : {tot_count}")
 
     # 페이징: 마지막 페이지의 수 구하기
     last_page_num = math.ceil(tot_count / limit) # 페이징: 반드시 올림을 해줘야함
-    print("last_page_num: ", last_page_num)
+    logger.info(f"last_page_num : {last_page_num}")
 
     if last_page_num < page:    # 페이징: 페이지 번호가 마지막 페이지 수보다 클때 에러 발생
+        logger.error("last_page_num: {last_page_num} <page: {page}")
         raise HTTPException(
                     status_code = 400,detail=f'last pagination is {last_page_num}, page number should be less than last page number')
 
@@ -283,25 +302,25 @@ async def search_programs(data = None, page: int = Query(1, description="Page nu
 
     # 페이징: 현재 블럭의 위치 (첫 번째 블럭이라면, block_num = 0)
     block_num = int((page - 1) / block_size)
-    print("block_num: ", block_num)
+    logger.info(f"block_num: {block_num}")
 
     # 페이징: 현재 블럭의 맨 처음 페이지 넘버 (첫 번째 블럭이라면, block_start = 1, 두 번째 블럭이라면, block_start = 6)
     block_start = (block_size * block_num) + 1
-    print("block_start: ", block_start)
+    logger.info(f"block_start : {block_start}")
 
     # 페이징: 현재 블럭의 맨 끝 페이지 넘버 (첫 번째 블럭이라면, block_end = 5)
     block_end = block_start + (block_size - 1)
-    print("block_end: ", block_end)
+    logger.info(f"block_end : {block_end}")
 
     # return_list = []
     # j=0
     # for i in datas:
     #     return_list.append(i)
     #     j+=1
-    #     # print(f"datas{j}: ", i)
+    #     # logger.info(f"datas{j}: ", i)
 
     # json_list = json.loads(json_util.dumps(return_list))
-    # print("List in Json : ", json_list)
+    # logger.info(f"List in Json : {json_list}")
 
     return {"page_limit": limit, 
             "page": page, 
@@ -311,7 +330,6 @@ async def search_programs(data = None, page: int = Query(1, description="Page nu
             "List_in_Json": results}
     # return results 
 
-import math
 # 모든 프로그램 보기 함수(토큰x, 페이지 추가)
 @router.get("/programs/readall/pagination",  tags=['program_without_Token'])
 def programs_list(page: int = Query(1, description="Page number", ge=1)):
@@ -325,19 +343,20 @@ def programs_list(page: int = Query(1, description="Page number", ge=1)):
 
     datas = db.find({}).skip((page - 1) * limit).limit(limit)  # program_db 컬럭션에 있는 모든 데이터를 가져옴
 
-    print("datas: ", datas)
+    logger.info(f"datas: {datas}")
 
     # 게시물의 총 개수 세기
     tot_count = db.count_documents({})
 
-    print("tot_count: ", tot_count)
+    logger.info(f"tot_count: {tot_count}")
 
     # 마지막 페이지의 수 구하기
     last_page_num = math.ceil(tot_count / limit) # 반드시 올림을 해줘야함
 
-    print("last_page_num: ", last_page_num)
+    logger.info(f"last_page_num: {last_page_num}")
 
     if last_page_num < page:    # 페이지 번호가 마지막 페이지 수보다 클때 에러 발생
+        logger.error(f"last_page_num : {last_page_num} < page : {page}")
         raise HTTPException(
                     status_code = 400,detail=f'last pagination is {last_page_num}, page number should be less than last page number')
 
@@ -346,25 +365,25 @@ def programs_list(page: int = Query(1, description="Page number", ge=1)):
 
     # 현재 블럭의 위치 (첫 번째 블럭이라면, block_num = 0)
     block_num = int((page - 1) / block_size)
-    print("block_num: ", block_num)
+    logger.info(f"block_num: {block_num}")
 
     # 현재 블럭의 맨 처음 페이지 넘버 (첫 번째 블럭이라면, block_start = 1, 두 번째 블럭이라면, block_start = 6)
     block_start = (block_size * block_num) + 1
-    print("block_start: ", block_start)
+    logger.info(f"block_start: {block_start}")
 
     # 현재 블럭의 맨 끝 페이지 넘버 (첫 번째 블럭이라면, block_end = 5)
     block_end = block_start + (block_size - 1)
-    print("block_end: ", block_end)
+    logger.info(f"block_end: {block_end}")
 
     return_list = []
     j=0
     for i in datas:
         return_list.append(i)
         j+=1
-        # print(f"datas{j}: ", i)
+        # logger.info(f"datas{j}: ", i)
 
     json_list = json.loads(json_util.dumps(return_list))
-    print("List in Json : ", json_list)
+    logger.info(f"List in Json : {json_list}")
 
     return {"limit": limit, "page": page, "block_start": block_start, "block_end": block_end, "last_page_num": last_page_num, "List_in_Json": json_list}
 
@@ -383,12 +402,12 @@ def programs_list(page: int = Query(1, description="Page number", ge=1)):
 #     for i in content:
 #         return_list.append(i)
 #         j+=1
-#         print(f"content{j}: ", i)
+#         logger.info(f"content{j}: ", i)
 
-#     print("List : ",return_list)
+#     logger.info(f"List : {return_list}")
 
 #     json_list = json.loads(json_util.dumps(return_list))
-#     print("List in Json : ", json_list)
+#     logger.info(f"List in Json : {json_list}")
 #     return json_list
 
 
@@ -401,7 +420,7 @@ async def read_single_program(id: str):
 
     try:
         content = db.find_one({"_id": ObjectId(id)})
-        print("content : ", content)
+        logger.info(f"content : {content}")
         return content
 
     except IndexError:
@@ -419,7 +438,7 @@ async def read_single_program(id: str, token: str = Header()):
     except:
         raise HTTPException(status_code=401, detail='Invalid token')
 
-    print("payload : ",payload)
+    logger.info(f"payload : {payload}")
 
     if 'email' in payload:
         author = payload['email']
@@ -428,21 +447,22 @@ async def read_single_program(id: str, token: str = Header()):
 
     try:
         content = db.find_one({'$and': [{"_id": ObjectId(id)},{"author": author}]})
-        print("content : ", content)
+        logger.info(f"content : {content}")
         return content
 
     except IndexError:
+        logger.error("Post not found")
         raise HTTPException(status_code=400, detail="Post not found")
 
 # 프로그램 추가(토큰 없이 테스트)
 @router.post("/programs/posts/test", tags=['programs'])
 async def create_programs(request: Request = Body()) :
     # Request Object를 직접 가져오면, FastAPI에 의해 유효성 검사와 문서화가 되지 않는다. 
-    print('request : ', request)
+    logger.info(f'request : {request}')
 
     data = await request.json() # TODO: 왜 되는지 모르겠다.
-    print('data2:' ,data)
-    print('program_title : ', data['program_title'])
+    logger.info(f'data : {data}')
+    logger.info(f"program_title : {data['program_title']}")
     
     programs = data
 
@@ -456,6 +476,7 @@ async def create_programs(request: Request = Body()) :
     period_for_reservation_end = programs['period_for_reservation_end']
 
     if period_for_reservation_start > period_for_reservation_end:
+        logger.error("The reservation start day should be before the end day.")
         raise HTTPException(
                     status_code=400,detail='The reservation start day should be before the end day.')
 
@@ -463,8 +484,10 @@ async def create_programs(request: Request = Body()) :
     period_for_class_end = programs['period_for_class_end']
 
     if period_for_class_start > period_for_class_end:
+        logger.error('The class start day should be before the end day.')
         raise HTTPException(
                     status_code=400,detail='The class start day should be before the end day.')
+
     price = programs['program_price']
     degree = programs['degree']
     on_offline = programs['on_offline']
@@ -486,29 +509,29 @@ async def create_programs(request: Request = Body()) :
         "created_at" : datetime.now()}
 
     content = db.insert_one(data)
-    # print("content : ", content)
     content_id = content.inserted_id
-    print("content_id : ",content_id)
-    print("content : ", db.find_one({"_id": ObjectId(content_id)}))
+    logger.info(f"content_id : {content_id}")
+    logger.info(f"content : {db.find_one({'_id': ObjectId(content_id)})}")
     
     return {"programs_id":'content_id' }
 
 # 프로그램 추가
 @router.post("/programs/posts", tags=['programs'])
 async def create_programs(request: Request = Body(), token: str = Header()):
-    print('request : ', request)
+    
+    logger.info(f'request : {request}')
 
     programs = await request.json() # TODO: 왜 되는지 모르겠다.
-    print('data2:' ,programs )
-    print('program_title : ', programs['program_title'])
- 
+    logger.info(f'data : {data}')
+    logger.info(f"program_title : {data['program_title']}")
+    
     try :
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     
     except:
         raise HTTPException(status_code=401, detail='Invalid token')
 
-    print("payload : ",payload)
+    logger.info(f"payload : {payload}")
 
     if 'email' in payload:
         email = payload['email']
@@ -528,6 +551,7 @@ async def create_programs(request: Request = Body(), token: str = Header()):
     period_for_reservation_end = programs['period_for_reservation_end']
 
     if period_for_reservation_start > period_for_reservation_end:
+        logger.error("The reservation start day should be before the end day.")
         raise HTTPException(
                     status_code=400,detail='The reservation start day should be before the end day.')
 
@@ -535,8 +559,10 @@ async def create_programs(request: Request = Body(), token: str = Header()):
     period_for_class_end = programs['period_for_class_end']
 
     if period_for_class_start > period_for_class_end:
+        logger.error('The class start day should be before the end day.')
         raise HTTPException(
                     status_code=400,detail='The class start day should be before the end day.')
+
     price = programs['program_price']
     degree = programs['degree']
     on_offline = programs['on_offline']
@@ -558,10 +584,10 @@ async def create_programs(request: Request = Body(), token: str = Header()):
         "created_at" : datetime.now()}
 
     content = db.insert_one(data)
-    # print("content : ", content)
     content_id = content.inserted_id
-    print("content_id : ",content_id)
-    print("content : ", db.find_one({"_id": ObjectId(content_id)}))
+
+    logger.info(f"content_id : {content_id}")
+    logger.info(f"content : {db.find_one({'_id': ObjectId(content_id)})}")
    
     return {"programs_id":'content_id' }
 
@@ -575,7 +601,7 @@ def update_program_post( id: str, programs: Programs, token: str = Header()):
     except:
         raise HTTPException(status_code=401, detail='Invaild token')
 
-    print("payload : ",payload)
+    logger.info(f"payload : {payload}")
 
     if 'email' in payload:
         email = payload['email']
@@ -583,6 +609,7 @@ def update_program_post( id: str, programs: Programs, token: str = Header()):
         email = payload['sub']
     
     if email != 'admin@gmail.com': # 관리자만 작성할 수 있음. 
+        logger.error("wrong admin email")
         raise HTTPException(status_code=401, detail='Not authorized account')
 
     # DB연결
@@ -603,7 +630,7 @@ def update_program_post( id: str, programs: Programs, token: str = Header()):
         raise HTTPException(
                     status_code=400,detail='The class start day should be before the end day.')
 
-    print("db : ",db)
+    logger.info(f"db : {db}")
     try:
         if db.count_documents({"_id": ObjectId(id)}) > 0: # 관리자인 다른 사람도 수정할 수 있음. 
 
@@ -622,13 +649,15 @@ def update_program_post( id: str, programs: Programs, token: str = Header()):
                         },
                         "$currentDate": {"lastModified": True}})
 
-            print("content : ", db.find_one({"_id": ObjectId(id)}))
+            logger.info(f"content : {db.find_one({'_id': ObjectId(id)})}")
 
             content = db.find_one({"_id": ObjectId(id)})
 
             return {"update_program_post_id": id}
     except IndexError:
+        logger.error("no matched content id")
         raise HTTPException(status_code=404, detail="Post not found")
+    
 
 # 프로그램 삭제
 @router.delete("/programs/posts/{id}", tags=['programs'])
@@ -639,7 +668,7 @@ async def delete_program_post(id: str, token: str = Header()):
     except:
         raise HTTPException(status_code=401, detail='Invaild token')
 
-    print("payload : ",payload)
+    logger.info(f"payload : {payload}")
 
     if 'email' in payload:
         email = payload['email']
@@ -682,8 +711,8 @@ class Comments(BaseModel):
 # 댓글 추가
 @router.post("/comments/posts", tags=['comments'])
 def create_comment(comments: Comments, token: str = Header()):
-    print(comments)
-    print(len(comments.content)) # pydantic이 최대 글자수를 넘는 순간 에러를 발생시킨다.
+    logger.info(f"comments : {comments}")
+    logger.info(len(comments.content)) # pydantic이 최대 글자수를 넘는 순간 에러를 발생시킨다.
 
     # if len(comments.content) > 300:
     #     raise HTTPException(status_code=400, detail='Maximum 300 letters')
@@ -692,9 +721,10 @@ def create_comment(comments: Comments, token: str = Header()):
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     
     except:
+        logger.error('token is invalid')
         raise HTTPException(status_code=401, detail='Invalid token')
 
-    print("payload : ",payload)
+    logger.info(f"payload : {payload}")
 
     if 'email' in payload:
         email = payload['email']
@@ -720,9 +750,10 @@ def create_comment(comments: Comments, token: str = Header()):
     content = db.insert_one(data)
 
     content_id = content.inserted_id
-    print("content_id : ",content_id)
-    print("content : ", db.find_one({"_id": ObjectId(content_id)}))
-    
+
+    logger.info(f"content_id : {content_id}")
+    logger.info(f"content : {db.find_one({'_id': ObjectId(content_id)})}")
+
     return {"comment_id":content_id }
 
 # 댓글 전체 읽기
@@ -740,11 +771,12 @@ def read_all_comments( skip: int = 0, limit: int = 20):
     for i in content:
         return_list.append(i)
         j+=1
-        print(f"content{j}: ", i)
+        logger.info(f"content{j}: ", i)
 
-    print("List : ",return_list)
+    logger.info(f"List : {return_list}")
     json_list = json.loads(json_util.dumps(return_list))
-    print("List in Json : ", json_list)
+    logger.info(f"Json List : {json_list}")
+
     return json_list
 
 # 댓글 수정
@@ -756,7 +788,7 @@ def update_comment_post(id: str, comments: Comments, token: str = Header()):
     except:
         raise HTTPException(status_code=401, detail='Invalid token')
 
-    print("payload : ",payload)
+    logger.info(f"payload : {payload}")
 
     if 'email' in payload:
         email = payload['email']
@@ -774,11 +806,12 @@ def update_comment_post(id: str, comments: Comments, token: str = Header()):
                                     "$currentDate": {"lastModified": True}})
 
             content = db.find_one({"_id": ObjectId(id)})
-            print("content : ",content)
+            logger.info(f"content : {content}")
 
             return {"update_program_post_id": id}
 
     except IndexError:
+        logger.info("no matched content_id")
         raise HTTPException(status_code=404, detail="Post not found")
 
 # 댓글 삭제
@@ -789,7 +822,7 @@ async def delete_post(id: str, token: str = Header()):
     except:
         raise HTTPException(status_code=401, detail='Invalid token')
 
-    print("payload : ",payload)
+    logger.info(f"payload : {payload}")
 
     if 'email' in payload:
         email = payload['email']

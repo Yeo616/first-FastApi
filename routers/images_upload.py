@@ -11,7 +11,7 @@ import logging
 router = APIRouter(prefix='/images')
 
 # 로그 생성
-logger = logging.getLogger('register')                                               # Logger 인스턴스 생성, 命名
+logger = logging.getLogger('images_upload')                                               # Logger 인스턴스 생성, 命名
 logger.setLevel(logging.DEBUG)                                                       # Logger 출력 기준 설정
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')# Formatter 생성, log 출력 형식
 
