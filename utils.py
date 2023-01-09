@@ -3,7 +3,8 @@ from passlib.context import CryptContext
 import os
 from datetime import datetime, timedelta
 from typing import Union, Any
-from jose import JWTError, jwt
+# from jose import JWTError, jwt
+import jwt
 import pymongo
 
 # openssl로 생성한 secret_key

@@ -4,6 +4,8 @@ from datetime import datetime
 import os
 from typing import List
 # from fastapi.staticfiles import StaticFiles
+import logging
+import uuid
 
 router = APIRouter(prefix='/images', tags=['images'])
 
@@ -15,12 +17,20 @@ router = APIRouter(prefix='/images', tags=['images'])
 # async def create_files(files: List[bytes] = File(...)):
 #     return {"file_sizes": [len(file) for file in files]}
 
-import uuid
+# 로그 생성
+logger = logging.getLogger('story_images')                                               # Logger 인스턴스 생성, 命名
+logger.setLevel(logging.DEBUG)                                                       # Logger 출력 기준 설정
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')# Formatter 생성, log 출력 형식
+
+# log 출력
+StreamHandler = logging.StreamHandler()                                              # 콘솔 출력 핸들러 생성
+StreamHandler.setFormatter(formatter)                                                
+logger.addHandler(StreamHandler)    
 
 # 이미지 로컬에 업로드
 @router.post("/uploadfiles")
 async def create_upload_files(files: List[UploadFile] = File(...)):
-    print(files)
+    logger.info(files)
     # 이미지 저장할 경로 지정
     UPLOAD_DIRECTORY = "./saving_images/"
     LOCAL_URL = "http://localhost:8000"
@@ -33,9 +43,9 @@ async def create_upload_files(files: List[UploadFile] = File(...)):
         saved_file_name = f"{currentTime}{str(uuid.uuid4())}.jpg" # 업로드한 시간과 UUID를 이용해서 유니크한 파일명으로 변경
         saved_file_path = f"{LOCAL_URL}/images/{saved_file_name}" # localhost:8000/ 파일 경로 url
 
-        print("original file name: ",file.filename)
-        print("file_names : ",saved_file_name)
-        print("file_path: ",saved_file_path)
+        logger.info(f"original file name : {file.filename}")
+        logger.info(f"file_names : {saved_file_name}")
+        logger.info(f"file_path : {saved_file_path}")
 
         with open(os.path.join(UPLOAD_DIRECTORY, saved_file_name), "wb") as fp: # 해당 경로에 있는 파일을 바이러니 형식으로 open
             fp.write(contents) # 로컬에 이미지 저장(쓰기)
@@ -48,5 +58,5 @@ UPLOAD_DIRECTORY = "./saving_images/"
 # 이미지 로컬에 있는 이미지 불러오기
 @router.get('/{file_name}')
 def get_image(file_name:str):
-    print(" getcwd: ", f"{os.getcwd()}")
+    logger.info(f" getcwd: {os.getcwd()}")
     return FileResponse(f"{os.getcwd()}/{UPLOAD_DIRECTORY}/{file_name}") # os.getcwd: 현재 위치해있는 디렉토리를 표시

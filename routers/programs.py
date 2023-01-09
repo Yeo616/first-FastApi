@@ -220,7 +220,6 @@ async def search_programs(
    
     return results
 
-
 # 텍스트 검색 기능, 페이징 처리
 @router.get("/programs/search-text", tags=["program_without_Token"])
 async def search_programs(data = None, page: int = Query(1, description="Page number", ge=1)):

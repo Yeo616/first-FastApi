@@ -55,7 +55,7 @@ import logging
 import traceback
 from mongo_log import MongoHandler #// 직접 만든 Mongo 핸들러
 
-logger   = logging.getLogger('uesr_log')   # logging 인스턴스 생성
+logger   = logging.getLogger('main.py')   # logging 인스턴스 생성
 level = logging.DEBUG                   # logger의 가장 낮은 수준인 DEBUG로 설정     
 # 만일 가장 낮은 수준으로 level을 설정하지 않는다면, 
 # 아래 handler들에서 setLevel을 한 것이 무의미해진다 (handler 별로 다른 level 설정하기)              
