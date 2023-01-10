@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Header, Query, File, UploadFile, Form
 from fastapi.security import OAuth2PasswordBearer
-from pydantic import  BaseModel
+from pydantic import  BaseModel, Field
 # from pyjwt import decode, InvalidTokenError
 from datetime import datetime
 from fastapi.security import OAuth2PasswordBearer
@@ -298,18 +298,17 @@ def read_all_posts( token: str = Header(),
     logger.info(f"block_end : {block_end}")
     return content
 
-    return_list = []
-    j=0
-    for i in content:
-        return_list.append(i)
-        j+=1
-        logger.info(f"content{j}: ", i)
+    # return_list = []
+    # j=0
+    # for i in content:
+    #     return_list.append(i)
+    #     j+=1
+    #     logger.info(f"content{j}: ", i)
 
-    logger.info(f"List : {return_list}")
-    json_list = json.loads(json_util.dumps(return_list))
-    logger.info(f"Json List : {json_list}")
-    return json_list
-
+    # logger.info(f"List : {return_list}")
+    # json_list = json.loads(json_util.dumps(return_list))
+    # logger.info(f"Json List : {json_list}")
+    # return json_list
 
 def validate_token(token: str):
     try:
@@ -319,6 +318,49 @@ def validate_token(token: str):
     except:
         logger.error(f"token : {token} is not valid")
         raise HTTPException(status_code=401, detail= 'Invalid token')
+
+# 하나의 스토리 읽기(토큰x)
+@router.get('/posts/{id}')
+async def read_single_post(id: str):
+    # DB연결
+    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+    db = myclient["test"]["story_db"]
+
+    try:
+        content = db.find_one({"_id": ObjectId(id)})
+        logger.info(f"content : {content}")
+        return content
+
+    except IndexError:
+        raise HTTPException(status_code=404, detail="wrong story_id")    
+
+# 하나의 스토리 읽기(토큰o) -> 비공개 게시물 등
+@router.get('/posts/token/{id}')
+async def read_single_post_token(id: str, token: str = Header()):
+    # DB연결
+    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+    db = myclient["test"]["story_db"]
+
+    try :
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except:
+        raise HTTPException(status_code=401, detail='Invalid token')
+
+    logger.info(f"payload : {payload}")
+
+    if 'email' in payload:
+        author = payload['email']
+    else:
+        author = payload['sub']
+
+    try:
+        content = db.find_one({'$and': {"_id": ObjectId(id)}})
+        logger.info(f"content : {content}")
+        return content
+
+    except IndexError:
+        raise HTTPException(status_code=400, detail="Post not found")
+
 
 # 스토리 추가(with file), 토큰없이 테스트
 @router.post("/posts/test", tags=['story_without_Token'])
@@ -479,7 +521,7 @@ async def create_post(program_title : str = Form(...),
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     
     except:
-        raise HTTPException(status_code=401, detail='Invaild token')
+        raise HTTPException(status_code=401, detail='Invalid token')
 
     logger.info(f"payload : {payload}")
 
@@ -718,7 +760,6 @@ async def delete_post(id: str, token: str = Header()):
         
     except IndexError:
         raise HTTPException(status_code=404, detail="Post not found")
-
 
 # # 모든 스토리 보기 함수(토큰x, 페이징 입력 가능)
 # @router.get("/readall/pagination",  tags=['story_without_Token'])
