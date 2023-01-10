@@ -24,30 +24,39 @@ origins = [
     "http://localhost:3000",
     "http://localhost:8000",
     "http://127.0.0.1:3000",
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
+    "192.168.1.101:54526",
+    "192.168.1.100:54526"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],        # 요청을 허용해야하는 originㅁ 목록
     # allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=True,     # ORIGIN 간 요청에 대해 쿠키를 지원해야 함. 기본값은 FALSE, 
+    allow_methods=["*"],        # 허용되어야하는 http 메서드 목록, 기본값은 GET
+    allow_headers=["*"],        # HTTP 요청 헤더 목록, 기본값은 [], 
 )
+# https://fastapi.tiangolo.com/tutorial/cors/
+
+
+
+@app.get("/")
+async def read_main():
+    return {"msg": "Hello World"}
 
 @app.get("/")
 async def g_index():
     return FileResponse('g_index.html')
 
-@app.get('/')
-async def test_get():
-    # client_host = request.client.host
-    return {"hello": "world"}
+# @app.get('/')
+# async def read_main():
+#     # client_host = request.client.host
+#     return {"hello": "world"}
 
-@app.post('/')
-def test_post(txt:str):
-    return {f"{txt} has tested."}
+# @app.post('/')
+# def test_post(txt:str):
+#     return {f"{txt} has tested."}
 
 
 # ============ 로그 관련 =============
@@ -55,7 +64,7 @@ import logging
 import traceback
 from mongo_log import MongoHandler #// 직접 만든 Mongo 핸들러
 
-logger   = logging.getLogger('main.py')   # logging 인스턴스 생성
+logger = logging.getLogger('main.py')   # logging 인스턴스 생성
 level = logging.DEBUG                   # logger의 가장 낮은 수준인 DEBUG로 설정     
 # 만일 가장 낮은 수준으로 level을 설정하지 않는다면, 
 # 아래 handler들에서 setLevel을 한 것이 무의미해진다 (handler 별로 다른 level 설정하기)              
