@@ -37,7 +37,6 @@ logger.addHandler(StreamHandler)
 
 class StoryPost(BaseModel): # 스키마 모델링
     program_title : str = Form() # essential, 연관된 프로그램 제목
-    # program_id : str # essential, 연관된 프로그램 제목 DB 저장된 id
 
     title:str = Form() # essential, 스토리 제목
     content:str = Form() # essential, 스토리 내용
@@ -68,7 +67,7 @@ class StoryPost(BaseModel): # 스키마 모델링
 
 class Degree(str): ## 회원 등급
     nobase: str = Form()
-    elementry: str = Form()
+    elementary: str = Form()
     middle: str = Form()
     high: str = Form()
     university: str = Form()
@@ -78,7 +77,7 @@ class on_offline(str): ## 수업 방식
     offline: str = Form()
     on_offline: str = Form()
     visit: str = Form()
-    outisde: str = Form()
+    outside: str = Form()
 
 class Class_contents(str): ## 수업 내용
     phonics: str = Form()
@@ -92,7 +91,7 @@ class Advance(str): ## 기존 조건
     quality:str = Form()
     facilities:str = Form()
     price : str = Form()
-    enviornment : str = Form()
+    environment  : str = Form()
     system : str = Form()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl = 'token')
@@ -101,7 +100,7 @@ JWT_SECRET = 'adcec27a3417b2de82130a2c54fc5c65aca0d7fa41b0a01dc310f3c78a62f885'
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# 선택/으로 검색기능, (토큰x, 페이징 처리)
+# 선택/옵션으로 검색기능, (토큰x, 페이징 처리)
 @router.get("/search_option", tags=["story_without_Token"])
 async def search_story(
                         search_option_degree:Degree = None, 
@@ -135,7 +134,7 @@ async def search_story(
 
         logger.info(f'data : {datas}')
 
-        return datas  # story_db 컬럭션에 있는 모든 데이터를 가져옴
+        return datas  # story_db 컬렉션에 있는 모든 데이터를 가져옴
 
     option_list = [search_option_degree, search_option_on_offline, search_option_class_contents, search_option_class_advance]
      
@@ -227,6 +226,90 @@ async def search_story(
     logger.info(f"block_end : {block_end}")
    
     return results
+
+# read all story posts with token (which all author wrote)
+@router.get("/posts/token", tags=['story']) 
+def read_all_posts( token: str = Header(), 
+                    page: int = Query(1, description="Page number", ge=1)):  
+    try :
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    
+    except:
+        logger.error("token is invalid")
+        raise HTTPException(status_code=401, detail='Invalid token')
+
+    logger.info(f"payload : {payload}")
+
+    if 'email' in payload:
+        author = payload['email']
+    else:
+        author = payload['sub']
+
+    # 페이징: 한 페이지 당 몇 개의 게시물을 출력할 것인가
+    limit = 10
+
+    # DB연결
+    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+    db = myclient["test"]["story_db"]
+
+    # TODO: decoded token and the author info are needed
+    # content = db.find({},{"author": "decoded token"})
+    content = db.find({"author": author}).sort('created_at',-1)
+    content = list(content)
+
+    # 결과값이 없으면
+    if len(content) <= 0:
+        return {"results": "No data found"}
+   
+    # limit(한 페이지에 보여주는 결과) 보다 결과값이 적으면, 페이징 처리할 필요가 없음
+    if len(content) <= limit:
+        return content
+    else:
+        content = db.find({"author": author}).sort('created_at',-1).skip((page - 1) * limit).limit(limit)
+        content = list(content)
+       
+    # limit보다 결과물이 많을 때
+    # 페이징: 게시물의 총 개수 세기
+    tot_count = len(list(db.find({"author": author})))
+    logger.info(f"tot_count : {tot_count}")
+
+    # 페이징: 마지막 페이지의 수 구하기
+    last_page_num = math.ceil(tot_count / limit) # 페이징: 반드시 올림을 해줘야함
+    logger.info(f"last_page_num : {last_page_num}")
+
+    if last_page_num < page:    # 페이징: 페이지 번호가 마지막 페이지 수보다 클때 에러 발생
+        logger.error(f"last_page_num : {last_page_num} < page : {page}")
+        raise HTTPException(
+                            status_code = 400,detail=f'last pagination is {last_page_num}, page number should be less than last page number')
+
+    # 페이징: 페이지 블럭을 5개씩 표기
+    block_size = 5
+
+    # 페이징: 현재 블럭의 위치 (첫 번째 블럭이라면, block_num = 0)
+    block_num = int((page - 1) / block_size)
+    logger.info(f"block_num : {block_num}")
+
+    # 페이징: 현재 블럭의 맨 처음 페이지 넘버 (첫 번째 블럭이라면, block_start = 1, 두 번째 블럭이라면, block_start = 6)
+    block_start = (block_size * block_num) + 1
+    logger.info(f"block_start : {block_start}")
+
+    # 페이징: 현재 블럭의 맨 끝 페이지 넘버 (첫 번째 블럭이라면, block_end = 5)
+    block_end = block_start + (block_size - 1)
+    logger.info(f"block_end : {block_end}")
+    return content
+
+    return_list = []
+    j=0
+    for i in content:
+        return_list.append(i)
+        j+=1
+        logger.info(f"content{j}: ", i)
+
+    logger.info(f"List : {return_list}")
+    json_list = json.loads(json_util.dumps(return_list))
+    logger.info(f"Json List : {json_list}")
+    return json_list
+
 
 def validate_token(token: str):
     try:
@@ -523,43 +606,6 @@ async def create_post(program_title : str = Form(...),
             "program_info":f"{program_info_db}"
             } # 연관된 프로그램 정보
 
-# read all story posts with token (whitch all author wrote)
-@router.get("/posts/token", tags=['story']) 
-def read_all_posts( token: str = Header(), skip: int = 0, limit: int = 10,):  
-    try :
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    
-    except:
-        logger.error("token is invalid")
-        raise HTTPException(status_code=401, detail='Invaild token')
-
-    logger.info(f"payload : {payload}")
-
-    if 'email' in payload:
-        author = payload['email']
-    else:
-        author = payload['sub']
-    
-    # DB연결
-    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-    db = myclient["test"]["story_db"]
-
-    # TODO: decoded token and the author info are needed
-    # content = db.find({},{"author": "decoded token"})
-    content = db.find({"author": author})
-
-    return_list = []
-    j=0
-    for i in content:
-        return_list.append(i)
-        j+=1
-        logger.info(f"content{j}: ", i)
-
-    logger.info(f"List : {return_list}")
-    json_list = json.loads(json_util.dumps(return_list))
-    logger.info(f"Json List : {json_list}")
-    return json_list
-
 # update a story post with token
 @router.put("/posts/{id}", tags=['story'])
 def update_post( id: str, post: StoryPost, token: str = Header()):
@@ -685,7 +731,7 @@ async def delete_post(id: str, token: str = Header()):
 #     # 한 페이지 당 몇 개의 게시물을 출력할 것인가
 #     # limit = 3
 
-#     datas = db.find({}).sort('created_at',-1).skip((page - 1) * limit).limit(limit)  # story_db 컬럭션에 있는 모든 데이터를 가져옴
+#     datas = db.find({}).sort('created_at',-1).skip((page - 1) * limit).limit(limit)  # story_db 컬렉션에 있는 모든 데이터를 가져옴
 
 #     logger.info(f"datas: {datas}")
 
