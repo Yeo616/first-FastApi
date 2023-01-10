@@ -46,7 +46,8 @@ class StoryPost(BaseModel): # 스키마 모델링
     class_contents: str = Form() # essential, 수업 내용
     advance : str = Form() # essential, 기존 조건
 
-    # img: str | None = None # non-essential, 스토리 내용 삽입 이미지
+    img: str | None = None # non-essential, 스토리 삽입 대표 이미지
+    img_db_id: str | None = None # non-essential, 스토리 삽입 이미지
 
     author: str = Form() # essential, 작성자 email
 
@@ -100,7 +101,7 @@ JWT_SECRET = 'adcec27a3417b2de82130a2c54fc5c65aca0d7fa41b0a01dc310f3c78a62f885'
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# 선택으로 검색기능, (토큰x, 페이징 처리)
+# 선택/으로 검색기능, (토큰x, 페이징 처리)
 @router.get("/search_option", tags=["story_without_Token"])
 async def search_story(
                         search_option_degree:Degree = None, 
@@ -114,11 +115,11 @@ async def search_story(
     logger.info(f'last 2 datas : {search_option_class_contents}, {search_option_class_advance}')
 
     # 페이징: 한 페이지 당 몇 개의 게시물을 출력할 것인가
-    limit = 3
+    limit = 10
  
     # DB연결
     myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-    db = myclient["test"]["program_db"]
+    db = myclient["test"]["story_db"]
 
     logger.info('db is connected')
 
@@ -126,7 +127,7 @@ async def search_story(
     if search_option_degree is None and search_option_on_offline is None and search_option_class_contents is None and search_option_class_advance is None:
         
         # datas = db.find({}) # 페이징 처리 안할 때
-        datas = db.find({}).skip((page - 1) * limit).limit(limit) # 페이징 처리
+        datas = db.find({}).sort('created_at',-1).skip((page - 1) * limit).limit(limit) # 페이징 처리
 
         logger.info('no input data, return all the data')
         
@@ -134,7 +135,7 @@ async def search_story(
 
         logger.info(f'data : {datas}')
 
-        return datas  # program_db 컬럭션에 있는 모든 데이터를 가져옴
+        return datas  # story_db 컬럭션에 있는 모든 데이터를 가져옴
 
     option_list = [search_option_degree, search_option_on_offline, search_option_class_contents, search_option_class_advance]
      
@@ -168,7 +169,6 @@ async def search_story(
             query_list.append(result_4)
             logger.info("result_4 has appended to query_list.")
       
-
     if len(query_list)>=2:
         query = {"$and" : query_list} 
         logger.info(f"{len(query_list)} query was created.")
@@ -179,7 +179,7 @@ async def search_story(
 
     # Issue the query to the "documents" collection
     # 검색 결과에서 가져올 데이터만 추린다. 
-    results = db.find(query)
+    results = db.find(query).sort('created_at',-1)
     # results = db.find(query).skip((page - 1) * limit).limit(limit)
     results = list(results)
     
@@ -194,7 +194,8 @@ async def search_story(
     if len(results) <= limit:
         return results
     else:
-        results = db.find(query).skip((page - 1) * limit).limit(limit)
+        results = db.find(query).sort('created_at',-1).skip((page - 1) * limit).limit(limit)
+        results = list(results)
         
     # limit보다 결과물이 많을 때
     # 페이징: 게시물의 총 개수 세기
@@ -254,9 +255,8 @@ async def create_post_test(
                         on_offline: str = Form(...), 
                         class_contents: str = Form(...), 
                         advance : str = Form(...), 
-                        files: UploadFile = File(...)
+                        files: UploadFile = File(default=None)
                      ):
-    print("program_title : ", program_title)
     # logger.info(f"had input : {post}")
     logger.info(f"had input : program title: {program_title}, title : {title}, content : {content}, degree: {degree}, on_offline : {on_offline}, class_contents : {class_contents}, advance: {advance}")
     logger.info(f"files : {files}")
@@ -350,10 +350,9 @@ async def create_post_test(
 
     # DB에 이미지 저장
     image_data = {
-            "story_id" : ObjectId(content_id),
+            "story_refered_id" : ObjectId(content_id),
             "image_url": saved_file_path,
             "image_name": saved_file_name,
-            "story_refered_id": program_id,
             "created_at": datetime.now()}
 
     image_content = image_db.insert_one(image_data)
@@ -368,7 +367,7 @@ async def create_post_test(
         fp.write(contents) # 로컬에 이미지 저장(쓰기)
     
     # 위에 생성한 story에다가 img_url 추가하기
-    db.update_one({"_id": ObjectId(content_id)},{"$set":{"img": saved_file_path}})
+    db.update_one({"_id": ObjectId(content_id)},{"$set":{"img": saved_file_path, "img_db_id": ObjectId(image_content_id)}})
 
     logger.info(f"content_modified : {db.find_one({'_id': ObjectId(content_id)})}")
     
@@ -382,9 +381,17 @@ async def create_post_test(
             "program_info":f"{program_info_db}"
             } # 연관된 프로그램 정보
 
-# create a new story post with token
+# create a new story post with token(with file)
 @router.post("/posts", tags=['story'])
-def create_post(post: StoryPost, token: str = Header()):
+async def create_post(program_title : str = Form(...),
+                title:str = Form(...),
+                content:str = Form(...),
+                degree: str = Form(...),
+                on_offline: str = Form(...),
+                class_contents: str = Form(...),
+                advance : str = Form(...),
+                files: UploadFile = File(default=None),
+                token: str = Header()):
     try :
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     
@@ -404,16 +411,20 @@ def create_post(post: StoryPost, token: str = Header()):
     class_contents_list = ["phonics", "reading", "toeic_ielts", "business_english", "job_interview", "etc"]
     advance_list = ["quality", "facilities", "price", "environment", "system"]
 
-    if not post.degree in degree_list:
+    # if not post.degree in degree_list:
+    if not degree in degree_list:
         raise HTTPException(status_code=400, detail="wrong degree input")
    
-    if not post.on_offline in on_offline_list:
+    # if not post.on_offline in on_offline_list:
+    if not on_offline in on_offline_list:
         raise HTTPException(status_code=400, detail="wrong on_offline input")
    
-    if not post.class_contents in class_contents_list:
+    # if not post.class_contents in class_contents_list:
+    if not class_contents in class_contents_list:
         raise HTTPException(status_code=400, detail="wrong class_contents input")
-
-    if not post.advance in advance_list:
+ 
+    # if not post.advance in advance_list:
+    if not advance in advance_list:
         raise HTTPException(status_code=400, detail="wrong advance input")
 
     # DB연결
@@ -421,34 +432,34 @@ def create_post(post: StoryPost, token: str = Header()):
    
     #프로그램 관련 DB 연결
     program_db = myclient['test']['program_db']
-    program_title = post.program_title
+   
     # 입력받은 값: program_title
     program_info_db = program_db.find({"program_title": program_title})
     program_info_db = list(program_info_db)
     logger.info(f"program_title_db : {program_info_db}")
     logger.info(f"len(program_title_db) : {len(program_info_db)}")
-
+ 
     # program_title 입력이 잘못 되었을 경우
     if len(program_info_db) != 1:
-        logger.info(f"program_title is wrong")
-        raise HTTPException(status_code=400, detail="wrong program title") 
-    logger.info(f'program_title_count : {program_db.count_documents({"program_title": post.program_title})}')
-
+        raise HTTPException(status_code=400, detail="wrong program title")
+    logger.info(f'program_title_count : {program_db.count_documents({"program_title": program_title})}')
+ 
     # 참고하는 프로그램 정보
     program_id = program_info_db[0]['_id']
     logger.info(f"program_title_db_id : {program_id}")
 
+
     # DB연결
     db = myclient["test"]["story_db"]
    
-    data = {"program_title": post.program_title,
+    data = {"program_title": program_title,
             "program_id": program_id,
-            "title": post.title,
-            "content":post.content,
-            "degree": post.degree,
-            "on_offline": post.on_offline,
-            "class_contents": post.class_contents,
-            "advance" : post.advance,
+            "title": title,
+            "content": content,
+            "degree": degree,
+            "on_offline": on_offline,
+            "class_contents": class_contents,
+            "advance" : advance,
             "author": author,
             "created_at": datetime.now()}
 
@@ -460,9 +471,57 @@ def create_post(post: StoryPost, token: str = Header()):
     data_in_db = db.find_one({"_id": ObjectId(content_id)})
     logger.info(f"content : {data_in_db}")
    
-    return {"content_id":f"{content_id}", # 스토리 콘텐츠 아이디
-            "content_data": data_in_db,   # 스토리 입력 값
-            "program_info":f"{program_info_db}"} # 연관된 프로그램 정보
+    if files is None:
+        return {"content_id":f"{content_id}", # 스토리 콘텐츠 아이디
+                "content_data": data_in_db,   # 스토리 입력 값
+                "program_info":f"{program_info_db}"} # 연관된 프로그램 정보
+       
+    ##============ 이미지 업로드(대표 이미지) ==================
+    # 이미지 저장할 경로 지정
+    UPLOAD_DIRECTORY = "./saving_images/"
+    LOCAL_URL = "http://192.168.1.101:8000"
+ 
+    # 이미지 DB 연결
+    image_db = myclient["test"]["image_db"]
+ 
+    currentTime = datetime.now().strftime("%Y%m%d%H%M%S")
+   
+    contents = await files.read() # 파일을 읽는 동안 CPU가 다른 일을 하도록 명령
+    saved_file_name = f"{currentTime}{str(uuid.uuid4())}.jpg" # 업로드한 시간과 UUID를 이용해서 유니크한 파일명으로 변경
+    saved_file_path = f"{LOCAL_URL}/images/{saved_file_name}" # localhost:8000/ 파일 경로 url
+ 
+    # DB에 이미지 저장
+    image_data = {
+            "story_refered_id" : ObjectId(content_id),
+            "image_url": saved_file_path,
+            "image_name": saved_file_name,
+            "created_at": datetime.now()}
+ 
+    image_content = image_db.insert_one(image_data)
+    image_content_id = image_content.inserted_id
+    logger.info(f"image content_id : {image_content_id}")
+ 
+    # logger.info(f"original file name: {file.filename}")
+    logger.info(f"file_names : {saved_file_name}")
+    logger.info(f"file_path: {saved_file_path}")
+ 
+    with open(os.path.join(UPLOAD_DIRECTORY, saved_file_name), "wb") as fp: # 해당 경로에 있는 파일을 바이러니 형식으로 open
+        fp.write(contents) # 로컬에 이미지 저장(쓰기)
+   
+    # 위에 생성한 story에다가 img_url 추가하기
+    db.update_one({"_id": ObjectId(content_id)},{"$set":{"img": saved_file_path, "img_db_id": ObjectId(image_content_id)}})
+ 
+    logger.info(f"content_modified : {db.find_one({'_id': ObjectId(content_id)})}")
+   
+    content_db = db.find_one({"_id": ObjectId(content_id)})
+ 
+    # 연관된 프로그램 정보도 넘기게 하였음.
+    return {
+            "file_path": saved_file_path, # 파일 더미에서 각 저장한 경로 및 파일명 호출
+            "content_id":f"{content_id}", # 스토리 콘텐츠 아이디
+            "content_data": content_db,   # 스토리 입력 값
+            "program_info":f"{program_info_db}"
+            } # 연관된 프로그램 정보
 
 # read all story posts with token (whitch all author wrote)
 @router.get("/posts/token", tags=['story']) 
@@ -475,7 +534,6 @@ def read_all_posts( token: str = Header(), skip: int = 0, limit: int = 10,):
         raise HTTPException(status_code=401, detail='Invaild token')
 
     logger.info(f"payload : {payload}")
-
 
     if 'email' in payload:
         author = payload['email']
@@ -501,31 +559,6 @@ def read_all_posts( token: str = Header(), skip: int = 0, limit: int = 10,):
     json_list = json.loads(json_util.dumps(return_list))
     logger.info(f"Json List : {json_list}")
     return json_list
-
-# # read all story posts without token
-# @router.get("/posts", tags=['story_without_Token']) 
-# def read_all_posts( skip: int = 0, limit: int = 10):  
-    
-#     # DB연결
-#     myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-#     db = myclient["test"]["story_db"]
-
-#     # TODO: decoded token and the author info are needed
-#     # content = db.find({},{"author": "decoded token"})
-#     content = db.find()
-
-#     return_list = []
-#     j=0
-#     for i in content:
-#         return_list.append(i)
-#         j+=1
-    #     logger.info(f"content{j}: ", i)
-
-
-    # logger.info(f"List : {return_list}")
-    # json_list = json.loads(json_util.dumps(return_list))
-    # logger.info(f"Json List : {json_list}")
-#     return json_list
 
 # update a story post with token
 @router.put("/posts/{id}", tags=['story'])
@@ -629,7 +662,7 @@ async def delete_post(id: str, token: str = Header()):
     db = myclient["test"]["story_db"]
     
     try:
-        if db.count_documents({'$and': [{"_id": ObjectId(id)},{"author": author}]}) > 0:
+        if db.count_documents({'$and': [{"_id": ObjectId(id)},{"author": author}]}) > 0 or author == 'admin@gmail.com':
 
             db.delete_one({"_id": ObjectId(id)})
             # print("content : ",content.raw_result)
@@ -641,117 +674,59 @@ async def delete_post(id: str, token: str = Header()):
         raise HTTPException(status_code=404, detail="Post not found")
 
 
-# 모든 스토리 보기 함수(토큰x, 페이징 처리)
-@router.get("/readall/pagination",  tags=['story_without_Token'])
-def story_list(page: int = Query(1, description="Page number", ge=1), limit = 10):
+# # 모든 스토리 보기 함수(토큰x, 페이징 입력 가능)
+# @router.get("/readall/pagination",  tags=['story_without_Token'])
+# def story_list( page: int = Query(1, description="Page number", ge=1), 
+#                 limit = 3):
     
-    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-    db = myclient["test"]["story_db"]
+#     myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+#     db = myclient["test"]["story_db"]
 
-    # 한 페이지 당 몇 개의 게시물을 출력할 것인가
-    # limit = 3
+#     # 한 페이지 당 몇 개의 게시물을 출력할 것인가
+#     # limit = 3
 
-    datas = db.find({}).skip((page - 1) * limit).limit(limit)  # program_db 컬럭션에 있는 모든 데이터를 가져옴
+#     datas = db.find({}).sort('created_at',-1).skip((page - 1) * limit).limit(limit)  # story_db 컬럭션에 있는 모든 데이터를 가져옴
 
-    logger.info(f"datas: {datas}")
+#     logger.info(f"datas: {datas}")
 
-    # 게시물의 총 개수 세기
-    tot_count = db.count_documents({})
+#     # 게시물의 총 개수 세기
+#     tot_count = db.count_documents({})
 
-    logger.info(f"tot_count: {tot_count}")
+#     logger.info(f"tot_count: {tot_count}")
 
-    # 마지막 페이지의 수 구하기
-    last_page_num = math.ceil(tot_count / limit) # 반드시 올림을 해줘야함
+#     # 마지막 페이지의 수 구하기
+#     last_page_num = math.ceil(tot_count / limit) # 반드시 올림을 해줘야함
 
-    logger.info(f"last_page_num: {last_page_num}")
+#     logger.info(f"last_page_num: {last_page_num}")
 
-    if last_page_num < page:    # 페이지 번호가 마지막 페이지 수보다 클때 에러 발생
-        logger.error(f"last_page_num : {last_page_num} < page : {page}")
-        raise HTTPException(
-                    status_code = 400,detail=f'last pagination is {last_page_num}, page number should be less than last page number')
+#     if last_page_num < page:    # 페이지 번호가 마지막 페이지 수보다 클때 에러 발생
+#         logger.error(f"last_page_num : {last_page_num} < page : {page}")
+#         raise HTTPException(
+#                     status_code = 400,detail=f'last pagination is {last_page_num}, page number should be less than last page number')
 
-    # 페이지 블럭을 5개씩 표기
-    block_size = 5
+#     # 페이지 블럭을 5개씩 표기
+#     block_size = 5
 
-    # 현재 블럭의 위치 (첫 번째 블럭이라면, block_num = 0)
-    block_num = int((page - 1) / block_size)
-    logger.info(f"block_num: {block_num}")
+#     # 현재 블럭의 위치 (첫 번째 블럭이라면, block_num = 0)
+#     block_num = int((page - 1) / block_size)
+#     logger.info(f"block_num: {block_num}")
 
-    # 현재 블럭의 맨 처음 페이지 넘버 (첫 번째 블럭이라면, block_start = 1, 두 번째 블럭이라면, block_start = 6)
-    block_start = (block_size * block_num) + 1
-    logger.info(f"block_start: {block_start}")
+#     # 현재 블럭의 맨 처음 페이지 넘버 (첫 번째 블럭이라면, block_start = 1, 두 번째 블럭이라면, block_start = 6)
+#     block_start = (block_size * block_num) + 1
+#     logger.info(f"block_start: {block_start}")
 
-    # 현재 블럭의 맨 끝 페이지 넘버 (첫 번째 블럭이라면, block_end = 5)
-    block_end = block_start + (block_size - 1)
-    logger.info(f"block_end: {block_end}")
+#     # 현재 블럭의 맨 끝 페이지 넘버 (첫 번째 블럭이라면, block_end = 5)
+#     block_end = block_start + (block_size - 1)
+#     logger.info(f"block_end: {block_end}")
 
-    return_list = []
-    j=0
-    for i in datas:
-        return_list.append(i)
-        j+=1
-        # logger.info(f"datas{j}: ", i)
+#     return_list = []
+#     j=0
+#     for i in datas:
+#         return_list.append(i)
+#         j+=1
+#         # logger.info(f"datas{j}: ", i)
 
-    json_list = json.loads(json_util.dumps(return_list))
-    logger.info(f"List in Json : {json_list}")
+#     json_list = json.loads(json_util.dumps(return_list))
+#     logger.info(f"List in Json : {json_list}")
 
-    return {"limit": limit, "page": page, "block_start": block_start, "block_end": block_end, "last_page_num": last_page_num, "List_in_Json": json_list}
-
-# read posts, token x
-# 모든 프로그램 보기 함수(토큰x, 페이지 추가)
-@router.get("/posts")
-def programs_list(page: int = Query(1, description="Page number", ge=1)):
-    
-    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-    db = myclient["test"]["story_db"]
-
-    #####
-    # 한 페이지 당 몇 개의 게시물을 출력할 것인가
-    limit = 3
-
-    datas = db.find({}).skip((page - 1) * limit).limit(limit)  # program_db 컬럭션에 있는 모든 데이터를 가져옴
-
-    logger.info(f"datas: {datas}")
-
-    # 게시물의 총 개수 세기
-    tot_count = db.count_documents({})
-
-    logger.info(f"tot_count: {tot_count}")
-
-
-    if last_page_num < page:    # 페이지 번호가 마지막 페이지 수보다 클때 에러 발생
-        logger.error(f"last_page_num : {last_page_num} < page : {page}")
-        raise HTTPException(
-                    status_code = 400,detail=f'last pagination is {last_page_num}, page number should be less than last page number')
-
-    # 페이지 블럭을 5개씩 표기
-    block_size = 5
-    
-    # 마지막 페이지의 수 구하기
-    last_page_num = math.ceil(tot_count / limit) # 반드시 올림을 해줘야함
-    logger.info(f"last_page_num: {last_page_num}")
-
-    # 현재 블럭의 위치 (첫 번째 블럭이라면, block_num = 0)
-    block_num = int((page - 1) / block_size)
-    logger.info(f"block_num: {block_num}")
-
-    # 현재 블럭의 맨 처음 페이지 넘버 (첫 번째 블럭이라면, block_start = 1, 두 번째 블럭이라면, block_start = 6)
-    block_start = (block_size * block_num) + 1
-    logger.info(f"block_start: {block_start}")
-
-    # 현재 블럭의 맨 끝 페이지 넘버 (첫 번째 블럭이라면, block_end = 5)
-    block_end = block_start + (block_size - 1)
-    logger.info(f"block_end: {block_end}")
-
-    return_list = []
-    j=0
-    for i in datas:
-        return_list.append(i)
-        j+=1
-        # logger.info(f"datas{j}: ", i)
-
-    json_list = json.loads(json_util.dumps(return_list))
-    logger.info(f"List in Json : {json_list}")
-
-    return {"limit": limit, "page": page, "block_start": block_start, "block_end": block_end, "last_page_num": last_page_num, "List_in_Json": json_list}
-
+#     return {"limit": limit, "page": page, "block_start": block_start, "block_end": block_end, "last_page_num": last_page_num, "List_in_Json": json_list}
