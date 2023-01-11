@@ -31,7 +31,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # 요청을 허용해야하는 originㅁ 목록
+    allow_origins=["*"],        # 요청을 허용해야하는 origin목록
     # allow_origins=origins,
     allow_credentials=True,     # ORIGIN 간 요청에 대해 쿠키를 지원해야 함. 기본값은 FALSE, 
     allow_methods=["*"],        # 허용되어야하는 http 메서드 목록, 기본값은 GET

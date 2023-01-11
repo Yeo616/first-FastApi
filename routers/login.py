@@ -112,9 +112,7 @@ async def login_for_access_token(form_data:OAuth2PasswordRequestForm=Depends()):
 
     return {"access_token": access_token, "token_type": "bearer"}
 
-
-
-# 일반 로그인
+# 일반 로그인(on-site)
 @router.post('/login', response_model=Token)
 def UserLogin(user : LoginModel):
     # DB연결

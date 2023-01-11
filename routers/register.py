@@ -3,12 +3,15 @@ from email_validator import validate_email, EmailNotValidError
 from datetime import datetime
 import pymongo
 
-# User 입력값 형식 import
-from models.users import User_Register
+# # User 입력값 형식 import
+# from models.users import User_Register
 
 # 비밀번호 암호화, 체크하는 함수
 from utils import  get_hashed_password
 import logging
+from typing import Optional
+from datetime import datetime
+from pydantic import BaseModel, EmailStr
 
 router = APIRouter(prefix = '/users/snstype/email',tags= ['users'])
 
@@ -20,7 +23,31 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 # log 출력
 StreamHandler = logging.StreamHandler()                                              # 콘솔 출력 핸들러 생성
 StreamHandler.setFormatter(formatter)                                                
-logger.addHandler(StreamHandler)                                                     # logger 인스턴스에 handler 설정
+logger.addHandler(StreamHandler)       # logger 인스턴스에 handler 설정
+
+class User(BaseModel): # 로그인에 필요한 양식
+    email: EmailStr # essential
+    password: str # essential
+
+class User_Register(User): # 회원가입에 필요한 양식
+    password_confirm: str # essential
+    status:str # essential, Kinder/ Junior/ College / Adults,Senior
+    nickname: str # essential
+
+class UserInDB(User): # DB에 저장될 양식
+    hashed_password: str # essential
+    register_method: str # essential, 회원가입 방식: on_site / social
+    register_social: Optional[str] = None # non-essential, 소셜 회원가입 방식: Naver/ Kakao/ Google
+    created_at : datetime # essential
+
+    username: str | None = None # non-essential
+    region: Optional[str] = None # non-essential
+    phone_number : Optional[str] = None # non-essential
+    profile_pic : Optional[str] = None # non-essential
+    reservated_programs: Optional[list] # non-essential, 프로그램 _id 리스트
+    shopping_cart: Optional[list] = None # non-essential, 프로그램 _id 리스트
+    updated_at: Optional[datetime] = None # non-essential
+    comment : Optional[str] = None # non-essential
 
 # 회원가입
 @router.post("/register")

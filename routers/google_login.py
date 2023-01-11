@@ -18,7 +18,7 @@ StreamHandler = logging.StreamHandler()                                         
 StreamHandler.setFormatter(formatter)                                                
 logger.addHandler(StreamHandler)    
 
-class KakaoUser(BaseModel):
+class GoogleUser(BaseModel):
     sns_type = "google"
     email : EmailStr # 사용자 이메일
     username : str | None = None # 사용자 닉네임
