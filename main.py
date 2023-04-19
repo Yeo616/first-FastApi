@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Body,APIRouter, HTTPException, Depends, Request
-from routers import check_login, register, login, kakao_login, naver_login, programs, story_images, story_CRUD,google_login, check_login
+from fastapi import FastAPI
+from routers import inquiry_CRUD, statement_test, check_login, register, login, kakao_login, naver_login, programs, story_images, story_CRUD,google_login, check_login
 from fastapi.middleware.cors import CORSMiddleware
 from Payment import iamport
 
@@ -17,6 +17,9 @@ app.include_router(story_images.router)
 app.include_router(iamport.router)
 app.include_router(programs.router)
 app.include_router(check_login.router)
+app.include_router(inquiry_CRUD.router)
+app.include_router(statement_test.router)
+
 
 
 # CORS: 허용 origin
@@ -26,7 +29,8 @@ origins = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8000",
     "192.168.1.101:54526",
-    "192.168.1.100:54526"
+    "192.168.1.100:54526",
+    "exp://192.168.110.111:19000"
 ]
 
 app.add_middleware(
@@ -38,7 +42,6 @@ app.add_middleware(
     allow_headers=["*"],        # HTTP 요청 헤더 목록, 기본값은 [], 
 )
 # https://fastapi.tiangolo.com/tutorial/cors/
-
 
 
 @app.get("/")
