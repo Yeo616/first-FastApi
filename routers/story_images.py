@@ -27,10 +27,6 @@ StreamHandler = logging.StreamHandler()                                         
 StreamHandler.setFormatter(formatter)                                                
 logger.addHandler(StreamHandler)    
 
-@router.post("/test_for_get_form_data")
-async def test_get_form_data(program_title: str = Form()):
-    return print(program_title)
-
 
 # 이미지 로컬에 업로드
 @router.post("/uploadfiles")

@@ -73,20 +73,7 @@ class SnsType(str, Enum):
     google: str = "google"
     kakao: str = "kakao"
 
-class Program(BaseModel): # 클라에서 데이터 보낼 때 양식
-   
-    co_organization: str # essential, 협력사
-    title: str # essential, 프로그램 이름
-    res_time_start: str # essential, 예약 시간 시작
-    res_time_end: str # essential, 예약 시간 종료
-    prg_time_start: str # essential, 프로그램 진행 시간 시작
-    prg_time_end: str # essential, 프로그램 진행 시간 종료
-    max_count:str # essential, 최대 인원수
-    likes: Optional[int] = 0 # non-essential, 좋아요 수
-    counts: Optional[int] = 0 # non-essential, 참여/결제된 수
-    count_comments: Optional[int] = 0 # non-essential, 코멘트 갯수
-    amount: int # essential, 프로그램 금액
-    img: str # essential, 이미지 url
+
 
 class Log_Host(BaseModel): # 클라에서 데이터 보낼 때 양식
    

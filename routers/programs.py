@@ -801,7 +801,7 @@ class Comments(BaseModel):
 
     class config:
         schema_extra = {
-        'program_post_id': 'Refered program_post_id',
+        'program_post_id': 'Referred  program_post_id',
         'content': 'comment maximum 300 letters'}
 
 # 댓글 추가

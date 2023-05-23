@@ -78,7 +78,6 @@ async def get_current_user(token:str = Depends(oauth2_scheme)):
         raise credentials_exception
     return user
 
-
 # Update the /token path operation
 
 def authenticate_user(ba,username:str, password:str):
@@ -93,7 +92,6 @@ def authenticate_user(ba,username:str, password:str):
     if not verify_password(password, user['hashed_password']):
         return False
     return user
-
 
 @router.post('/token', response_model=Token)
 async def login_for_access_token(form_data:OAuth2PasswordRequestForm=Depends()):

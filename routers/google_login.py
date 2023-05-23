@@ -123,10 +123,3 @@ def google_register( req = Body()):
     user = db.find_one({"email":f"{email}"})
     return {'result' :'welcome back'}
 
-    # data = {"email" : user['email'], "ext" : f"{jwt_exp}"}
-  
-    # # 토큰 발행
-    # token = dict(
-    # Authorization=f"Bearer {create_access_token(data=data,expires_delta=30)}")
-
-    # logger.info(f"token : {token}")

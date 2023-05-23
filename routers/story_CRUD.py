@@ -354,7 +354,7 @@ async def read_single_post_token(id: str, token: str = Header()):
         author = payload['sub']
 
     try:
-        content = db.find_one({'$and': {"_id": ObjectId(id)}})
+        content = db.find_one({'$and': [{"_id": ObjectId(id)},{'author': author}]})
         logger.info(f"content : {content}")
         return content
 
@@ -750,11 +750,18 @@ async def delete_post(id: str, token: str = Header()):
     db = myclient["test"]["story_db"]
     
     try:
-        if db.count_documents({'$and': [{"_id": ObjectId(id)},{"author": author}]}) > 0 or author == 'admin@gmail.com':
+        
+        if db.count_documents({'$and': {"_id": ObjectId(id)}}) > 0:
+            content_to_delete = db.find({"_id": ObjectId(id)}) 
+            content_to_delete = list(content_to_delete)
+            logger.info(f"content_to_delete : {content_to_delete}")
+            story_author = content_to_delete[0]['author']
 
-            db.delete_one({"_id": ObjectId(id)})
-            # print("content : ",content.raw_result)
-            return {f"content_id : {id} ": "delete successed"}
+            # 작성자 혹은 또 다른 관리자만 삭제 가능
+            if author == 'admin@gmail.com'or author == story_author :
+                db.delete_one({"_id": ObjectId(id)})
+                # print("content : ",content.raw_result)
+                return {f"content_id : {id} ": "delete successed"}
 
         raise HTTPException(status_code=404, detail="Post not found")
         
